@@ -144,7 +144,9 @@ double FEM<dim>::xi_at_node(unsigned int dealNode){ // преобразован�
 //Define basis functions
 // Реализовать функцию, зная xi (кси) и node (номер узла)
 template <int dim>
-double FEM<dim>::basis_function(unsigned int node, double xi){ // A - node, xi - кси, для xi_B поможет функция xi_at_node; N_A = произведение(B от 1 до числа узлов в элементе) (xi-xi_B) / произведение(B от 1 до числа узлов в элементе, B!=A) (xi_A-xi_B)
+double FEM<dim>::basis_function(unsigned int node, double xi){ // A - node, xi - кси, для xi_B поможет функция xi_at_node; 
+//N_A = произведение(B от 1 до числа узлов в элементе, B!=A) (xi-xi_B) / произведение(B от 1 до числа узлов в элементе, B!=A) (xi_A-xi_B)
+
   /*"basisFunctionOrder" defines the polynomial order of the basis function,
     "node" specifies which node the basis function corresponds to, 
     "xi" is the point (in the bi-unit, or local, domain) where the function is being evaluated.
@@ -155,7 +157,13 @@ double FEM<dim>::basis_function(unsigned int node, double xi){ // A - node, xi -
   /*You can use the function "xi_at_node" (defined above) to get the value of xi (in the bi-unit domain)
     at any node in the element - using deal.II's element node numbering pattern.*/
 
-  //EDIT
+  //EDIT_DONE
+  //цикл по узлам в эл-те, n_ne - число узлов в эл-те=order+1
+  for (unsigned int B=0; B<basisFunctionOrder+1; B++){
+    if B != node {
+      value *= (xi - xi_at_node(B)) / (xi_at_node(node) - xi_at_node(B));
+    }
+  }
 
   return value;
 }
@@ -176,6 +184,20 @@ double FEM<dim>::basis_gradient(unsigned int node, double xi){
     at any node in the element - using deal.II's element node numbering pattern.*/
 
   //EDIT
+switch(node)
+{
+    case 1:
+        a++;
+    case 2:
+        a++;
+    case 3:
+        a++;
+}
+    for (unsigned int B=0; B<basisFunctionOrder+1; B++){
+    if B != node {
+      value *= (xi - xi_at_node(B)) / (xi_at_node(node) - xi_at_node(B));
+    }
+  }
 
   return value;
 }
@@ -185,7 +207,7 @@ template <int dim>
 void FEM<dim>::generate_mesh(unsigned int numberOfElements){
 
   //Define the limits of your domain
-  L = ; //EDIT (в записи 1?, нужен номер узла deal.II для правой границы?)
+  L = 0.1; //EDIT_DONE_??? (в записи 1?)
   double x_min = 0.; // слева координата 0
   double x_max = L; // справа координата L
 
@@ -199,7 +221,7 @@ void FEM<dim>::generate_mesh(unsigned int numberOfElements){
 //Specify the Dirichlet boundary conditions
 template <int dim>
 void FEM<dim>::define_boundary_conds(){ // определение граничных условий Дирихле (сложная из-за нумерации узлов в deal.II, не надо редактировать)
-  const unsigned int totalNodes = dof_handler.n_dofs(); //Total number of nodes
+  const unsigned int totalNodes = dof_handler.n_dofs(); //Total number of nodes (глобально)
 
   //Identify dirichlet boundary nodes and specify their values.
   //This function is called from within "setup_system"
@@ -218,7 +240,7 @@ void FEM<dim>::define_boundary_conds(){ // определение граничн
     }
     if(nodeLocation[globalNode] == L){ // правая граница
       if(prob == 1){
-	boundary_values[globalNode] = g2;
+	      boundary_values[globalNode] = g2;
       }
     }
   }
@@ -230,7 +252,7 @@ template <int dim>
 void FEM<dim>::setup_system(){
 
   //Define constants for problem (Dirichlet boundary values)
-  g1 = ; g2 = ; //EDIT (значений граничных условий Дирихле из задания)
+  g1 = 0; g2 = 0.001; //EDIT_DONE_??? (значений граничных условий Дирихле из задания)
 
   //Let deal.II organize degrees of freedom
   dof_handler.distribute_dofs (fe); // функция, осуществляющая отслеживание глобальных и локальных степеней свободы
@@ -262,7 +284,10 @@ void FEM<dim>::setup_system(){
   /*A quad rule of 2 is included here as an example. You will need to decide
     what quadrature rule is needed for the given problems*/
   // ЗАДАЧА - ПРАВИЛЬНО ОПРЕДЕЛИТЬ quadRule
+
+  //==============================================СЛУЧАЙ С quadRule - n_int=2
   quadRule = 2; //EDIT - Number of quadrature points along one dimension (нам этого будет мало, quadRule = 2 - точное интегрирование вплоть до многочленов третьей степени)
+  //в лекциях quadRule - n_int (стр.8)
   quad_points.resize(quadRule); quad_weight.resize(quadRule);
 
   // задание точек для вычисления значения функция при интегрировании (точки - корни многочленов Лежандра соответствующей степени, в данном примере - второй)
@@ -272,6 +297,9 @@ void FEM<dim>::setup_system(){
   // веса (википедия, находятся из условия точного подсчёта интегралов до определённой степени)
   quad_weight[0] = 1.; //EDIT
   quad_weight[1] = 1.; //EDIT
+
+  //==============================================
+
 
   //Just some notes...
   std::cout << "   Number of active elems:       " << triangulation.n_active_cells() << std::endl;
@@ -302,7 +330,8 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
   // h_e - длина элемента; x - соответствует кси (нужен для вычисления f); f - значение f
 
   //цикл по элементам
-  typename DoFHandler<dim>::active_cell_iterator elem = dof_handler.begin_active(), // elem - итератор, указывающий на начало структуры dof_handler; endc - указывает на элемент, что следует сразу за последним элементом
+  typename DoFHandler<dim>::active_cell_iterator elem = dof_handler.begin_active(), 
+  // elem - итератор, указывающий на начало структуры dof_handler; endc - указывает на элемент, что следует сразу за последним элементом
     endc = dof_handler.end();
   for (;elem!=endc; ++elem){ // цикл, пока текущий элемент не будет указывать на следующий за последним
 
@@ -319,27 +348,33 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
 
     //Loop over local DOFs and quadrature points to populate Flocal and Klocal.
     // интегрирование правой части (находим Flocal и Klocal и переходим к глобальным матрицам)
-    Flocal = 0.;
+    Flocal = 0.;  //считаем, что все элементы вектора равны 0
     // Flocal[i] = A*h_e/2 * int(от -1 до 1)(N_i(xi)f(x(xi)))dxi =
     // = A*h_e/2 * summ(j от 1 до quadRule)(N_i(xi_j) * f(x(xi_j)) * weight[j])
     // N_i(xi_j) - базисная функция (считается с помощью функции basis_function?)
     // f(x(xi_j)) = f(xi_j)?
-    for(unsigned int A=0; A<dofs_per_elem; A++){
+    for(unsigned int A=0; A<dofs_per_elem; A++){// цикл по всем узлам эл-та (dofs_per_elem - количество степеней свободы в элементе)
       for(unsigned int q=0; q<quadRule; q++){ // суммирование по квадратуре
-	x = 0;
-	//Interpolate the x-coordinates at the nodes to find the x-coordinate at the quad pt.
-	for(unsigned int B=0; B<dofs_per_elem; B++){ // интерполяция для отображения локальных координат xi в глобальный x
-	  x += nodeLocation[local_dof_indices[B]]*basis_function(B,quad_points[q]); // для подсчёта f(x(xi_j))?
-	}
-	//EDIT - Define Flocal.
-  // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
+        x = 0;
+        //Interpolate the x-coordinates at the nodes to find the x-coordinate at the quad pt.
+        for(unsigned int B=0; B<dofs_per_elem; B++){ // интерполяция для отображения локальных координат xi в глобальный x
+          x += nodeLocation[local_dof_indices[B]]*basis_function(B, quad_points[q]); // для подсчёта f(x(xi_j))?
+          //nodeLocation - берет X_e_A, 
+          //local_dof_indices мапит локальный номер узла к глобальному, а nodeLocation хранит координаты х 
+        }
+        //EDIT - Define Flocal.
+        // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
+        //согласно заданию, F(x) = f = 10^11Нм^(−4)*x
+        Flocal[A] += basis_function(A, quad_points(q)) * 10^11 * x * quad_weight[q];        
       }
+      Flocal[A] *= h_e/2;
     }
     //Add nonzero Neumann condition, if applicable
     // если задача имеет номер 2, то используем это условие для определения правой части (вкладываем его в вектор F)
     if(prob == 2){ 
       if(nodeLocation[local_dof_indices[1]] == L){
-	//EDIT - Modify Flocal to include the traction on the right boundary.
+	    //EDIT - Modify Flocal to include the traction on the right boundary.
+      
       }
     }
 
@@ -347,11 +382,12 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     Klocal = 0;
     for(unsigned int A=0; A<dofs_per_elem; A++){
       for(unsigned int B=0; B<dofs_per_elem; B++){
-	for(unsigned int q=0; q<quadRule; q++){
-	  //EDIT - Define Klocal.
-    // вставить код для определения компонентов Klocal (применить квадратурные формулы Гаусса)
-    // Klocal[i][j] = int(от -1 до 1) (N_i'xi * N_j'xi) dxi
-	}
+        for(unsigned int q=0; q<quadRule; q++){
+          //EDIT - Define Klocal.
+          // вставить код для определения компонентов Klocal (применить квадратурные формулы Гаусса)
+          // Klocal[i][j] = int(от -1 до 1) (N_i'xi * N_j'xi) dxi
+
+        }
       }
     }
 
