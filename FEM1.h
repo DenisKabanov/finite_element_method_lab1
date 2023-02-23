@@ -183,22 +183,37 @@ double FEM<dim>::basis_gradient(unsigned int node, double xi){
   /*You can use the function "xi_at_node" (defined above) to get the value of xi (in the bi-unit domain)
     at any node in the element - using deal.II's element node numbering pattern.*/
 
-  //EDIT
-switch(node)
-{
-    case 1:
-        a++;
-    case 2:
-        a++;
-    case 3:
-        a++;
-}
-    for (unsigned int B=0; B<basisFunctionOrder+1; B++){
-    if B != node {
-      value *= (xi - xi_at_node(B)) / (xi_at_node(node) - xi_at_node(B));
-    }
+  //EDIT_DONE_?
+  switch(basisFunctionOrder)  //basisFunctionOrder - max B, node - A
+  {
+      case 1:  // A!=B, А=1    для линейных базисных функций существует 2 node (в коде нумерация с 0 - узлы 0 и 1, а в лекциях с 1 - узлы 1 и 2)
+          switch(node){
+            case 0:
+              value = -1/2;
+            case 1:
+              value = 1/2;
+          }
+      case 2:   // для квадратичных базисных функций
+          switch(node){
+            case 0:
+              value = xi-1/2;
+            case 1:
+              value = -2*xi;
+            case 2:
+              value = xi+1/2;
+          }
+      case 3:
+          switch(node){
+            case 0:
+              value = -27/16 * pow(xi, 2) + 9/8 * xi + 1/16;
+            case 1:
+              value = 81/16 * pow(xi, 2) - 9/8 * xi - 27/16;
+            case 2:
+              value = -81/16 * pow(xi, 2) - 9/8 * xi + 27/16;
+            case 3:
+              value = 27/16 * pow(xi, 2) + 9/8 * xi - 1/16;;
+          }
   }
-
   return value;
 }
 
@@ -310,7 +325,7 @@ void FEM<dim>::setup_system(){
 template <int dim>
 void FEM<dim>::assemble_system(){ // ассемблирование (переход от суммирования по конечным элементам к матричной записи (умножение матриц))
 
-  K=0; F=0; // K - матрица жёсткости, F - вектор сил (правая часть в матричном уравнении)
+  K=0; F=0; // K - матрица жёсткости, F - вектор сил (правая часть в матричном уравнении) // глобальные (полноразмерные)
 
   const unsigned int   			dofs_per_elem = fe.dofs_per_cell; //This gives you number of degrees of freedom per element (количество степеней свободы в элементе)
   // cell - элемент в deal.II
@@ -353,19 +368,22 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     // = A*h_e/2 * summ(j от 1 до quadRule)(N_i(xi_j) * f(x(xi_j)) * weight[j])
     // N_i(xi_j) - базисная функция (считается с помощью функции basis_function?)
     // f(x(xi_j)) = f(xi_j)?
+    // считаем, что А=1
     for(unsigned int A=0; A<dofs_per_elem; A++){// цикл по всем узлам эл-та (dofs_per_elem - количество степеней свободы в элементе)
       for(unsigned int q=0; q<quadRule; q++){ // суммирование по квадратуре
         x = 0;
         //Interpolate the x-coordinates at the nodes to find the x-coordinate at the quad pt.
         for(unsigned int B=0; B<dofs_per_elem; B++){ // интерполяция для отображения локальных координат xi в глобальный x
+          // (преобразуем кси в икс, пользуясь изопараметрической формулировкой)
           x += nodeLocation[local_dof_indices[B]]*basis_function(B, quad_points[q]); // для подсчёта f(x(xi_j))?
           //nodeLocation - берет X_e_A, 
           //local_dof_indices мапит локальный номер узла к глобальному, а nodeLocation хранит координаты х 
         }
         //EDIT - Define Flocal.
         // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
-        //согласно заданию, F(x) = f = 10^11Нм^(−4)*x
-        Flocal[A] += basis_function(A, quad_points(q)) * 10^11 * x * quad_weight[q];        
+        //согласно заданию, F(x) = f = 10^11Нм^(−4)*x, Нм - Ньютон на метр
+        //long long pow(10, 11)
+        Flocal[A] += basis_function(A, quad_points(q)) * pow(10, 11) * x * quad_weight[q];        
       }
       Flocal[A] *= h_e/2;
     }
@@ -374,7 +392,7 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     if(prob == 2){ 
       if(nodeLocation[local_dof_indices[1]] == L){
 	    //EDIT - Modify Flocal to include the traction on the right boundary.
-      
+      Flocal[dofs_per_elem - 1]  += pow(10, 11)  // -1, т.к. индексы с 0, а нумерация узлов с 1, (индекс 0 - 1й узел) ???
       }
     }
 
@@ -383,10 +401,10 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     for(unsigned int A=0; A<dofs_per_elem; A++){
       for(unsigned int B=0; B<dofs_per_elem; B++){
         for(unsigned int q=0; q<quadRule; q++){
-          //EDIT - Define Klocal.
+          //EDIT_DONE - Define Klocal.
           // вставить код для определения компонентов Klocal (применить квадратурные формулы Гаусса)
           // Klocal[i][j] = int(от -1 до 1) (N_i'xi * N_j'xi) dxi
-
+          Klocal.add(A, B, basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q]);
         }
       }
     }
@@ -397,17 +415,18 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     // Важно помнить, что K - sparse (разреженная) матрица, поэтому нельзя просто написать K[i][j], используется команда K.add
     //*приводить матрицу K к квадратному виду (в задаче Дирихле) здесь не нужно, это делает deal.II с помощью apply_boundary_values
     for(unsigned int A=0; A<dofs_per_elem; A++){
-      //EDIT - add component A of Flocal to the correct location in F
-      /*Remember, local_dof_indices[A] is the global degree-of-freedom number
-	corresponding to element node number A*/
+      //EDIT_DONE - add component A of Flocal to the correct location in F
+      /*Remember, local_dof_indices[A] is the global degree-of-freedom number corresponding to element node number A*/
+      F[local_dof_indices[A]] += Flocal[A];
+
       for(unsigned int B=0; B<dofs_per_elem; B++){
-	//EDIT - add component A,B of Klocal to the correct location in K (using local_dof_indices)
-	/*Note: K is a sparse matrix, so you need to use the function "add".
-	  For example, to add the variable C to K[i][j], you would use:
-	  K.add(i,j,C);*/
+        //EDIT_DONE - add component A,B of Klocal to the correct location in K (using local_dof_indices)
+        /*Note: K is a sparse matrix, so you need to use the function "add".
+          For example, to add the variable C to K[i][j], you would use:
+          K.add(i,j,C);*/
+          K.add(local_dof_indices[A], local_dof_indices[B], Klocal[A][B]);
       }
     }
-
   }
 
   //Apply Dirichlet boundary conditions
@@ -468,15 +487,23 @@ double FEM<dim>::l2norm_of_error(){ // функция подсчёта l2 оши
     for(unsigned int q=0; q<quadRule; q++){ // находим интеграл
     	// l2 норма ошибки (без указания корня) = int(от 0 до 1) (u_h - u)^2 dx = [пока не контролируем производную, u - точное решение, u_h - конечно-элементное решение] =
       // = summ(по конечным элементам) (int(область конечного элемента _/\_e) (u_h - u)^2 dx) = [замена переменной x на xi в интеграле]
-      // = summ(по конечным элементам) (int(от -1 до 1) ((u_h - u)^2 * h_e/2) dxi) ==> проблема - вычислять u_h в произвольном xi (мы можем вычислять u_h в xi, что соответствует узлам, но чтобы вычислять u_h в произвольной xi нужно, как при вычислении правой части - F, посчитать x по xi (изопараметрическое задание))
+      // = summ(по конечным элементам) (int(от -1 до 1) ((u_h - u)^2 * h_e/2) dxi) 
+      //==> проблема - вычислять u_h в произвольном xi (мы можем вычислять u_h в xi, что соответствует узлам, 
+      //но чтобы вычислять u_h в произвольной xi нужно, как при вычислении правой части - F, посчитать x по xi (изопараметрическое задание))
       x = 0.; u_h = 0.;
       //Find the values of x and u_h (the finite element solution) at the quadrature points
       for(unsigned int B=0; B<dofs_per_elem; B++){
-	x += nodeLocation[local_dof_indices[B]]*basis_function(B,quad_points[q]); // для подсчёта u_h в произвольнм xi
-	u_h += D[local_dof_indices[B]]*basis_function(B,quad_points[q]); // восстанавливаем u_h только в тех точках, что нам нужны (зная степени сводобы local_dof_indices[B], так как уже решили систему (нашли D), и используя базисные функции)
+        // преобразуем кси в икс, пользуясь изопараметрической формулировкой
+        x += nodeLocation[local_dof_indices[B]] * basis_function(B, quad_points[q]); // для подсчёта u_h в произвольном xi
+        u_h += D[local_dof_indices[B]] * basis_function(B, quad_points[q]); 
+        // восстанавливаем u_h только в тех точках, что нам нужны (зная степени сводобы local_dof_indices[B], так как уже решили систему (нашли D), и используя базисные функции)
       }
       //EDIT - Find the l2-norm of the error through numerical integration.
-      /*This includes evaluating the exact solution at the quadrature points*/    }
+      /*This includes evaluating the exact solution at the quadrature points*/
+      u_exact = 
+
+      l2norm +=                     //по квадратурной формуле Гаусса
+    }
   }
 
   return sqrt(l2norm);
