@@ -184,48 +184,49 @@ double FEM<dim>::basis_gradient(unsigned int node, double xi){
     at any node in the element - using deal.II's element node numbering pattern.*/
 
   //EDIT_DONE_?
-  switch(int(basisFunctionOrder))  //basisFunctionOrder - max B, node - A
-  {
-      case 1:  // A!=B, А=1    для линейных базисных функций существует 2 node (в коде нумерация с 0 - узлы 0 и 1, а в лекциях с 1 - узлы 1 и 2)
-        switch(node){
-          case 0:
-            value = -1/2;
-            break;
-          case 1:
-            value = 1/2;
-            break;
-        }
-        break;
-      case 2:   // для квадратичных базисных функций
-        switch(node){
-          case 0:
-            value = xi-1/2;
-            break;
-          case 1:
-            value = -2*xi;
-            break;
-          case 2:
-            value = xi+1/2;
-            break;
-        }
-        break;
-      case 3:
-        switch(node){
-          case 0:
-            value = -27/16 * pow(xi, 2) + 9/8 * xi + 1/16;
-            break;
-          case 1:
-            value = 81/16 * pow(xi, 2) - 9/8 * xi - 27/16;
-            break;
-          case 2:
-            value = -81/16 * pow(xi, 2) - 9/8 * xi + 27/16;
-            break;
-          case 3:
-            value = 27/16 * pow(xi, 2) + 9/8 * xi - 1/16;
-            break;
-        }
-        break;
+
+  switch(int(basisFunctionOrder)){  //basisFunctionOrder - max B, node - A
+    case 1:  // A!=B, А=1    для линейных базисных функций существует 2 node (в коде нумерация с 0 - узлы 0 и 1, а в лекциях с 1 - узлы 1 и 2)
+      switch(node){
+        case 0:
+          value = -1./2;
+          break;
+        case 1:
+          value = 1./2;
+          break;
+      }
+      break;
+    case 2:   // для квадратичных базисных функций
+      switch(node){
+        case 0:
+          value = xi-1./2;
+          break;
+        case 1:
+          value = -2*xi;
+          break;
+        case 2:
+          value = xi+1./2;
+          break;
+      }
+      break;
+    case 3:
+      switch(node){
+        case 0:
+          value = -27./16 * pow(xi, 2) + 9./8 * xi + 1./16;
+          break;
+        case 1:
+          value = 81./16 * pow(xi, 2) - 9./8 * xi - 27./16;
+          break;
+        case 2:
+          value = -81./16 * pow(xi, 2) - 9./8 * xi + 27./16;
+          break;
+        case 3:
+          value = 27./16 * pow(xi, 2) + 9./8 * xi - 1./16;
+          break;
+      }
+      break;
   }
+  // std::cout << "returning value: " << value << std::endl; // !!!!!
   return value;
 }
 
@@ -395,7 +396,7 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
         // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
         //согласно заданию, F(x) = f = 10^11Нм^(−4)*x, Нм - Ньютон на метр
         //long long pow(10, 11)
-        Flocal[A] += basis_function(A, quad_points[q]) * pow(10, 11) * x * quad_weight[q];        
+        Flocal[A] += basis_function(A, quad_points[q]) * pow(10, 11) * x * quad_weight[q];
       }
       Flocal[A] *= h_e/2;
     }
@@ -416,10 +417,17 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
           //EDIT_DONE - Define Klocal.
           // вставить код для определения компонентов Klocal (применить квадратурные формулы Гаусса)
           // Klocal[i][j] = int(от -1 до 1) (N_i'xi * N_j'xi) dxi
+          // std::cout << basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q] << std::endl;// !!!!!
           Klocal.add(A, B, basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q]);
         }
       }
     }
+    // for(int a=0; a<dofs_per_elem; a++){// !!!!!
+    //   for(int b=0; b<dofs_per_elem;b++){// !!!!!
+    //     std::cout << Klocal[a][b] << "\t";// !!!!!
+    //   } // !!!!!
+    //   std::cout << std::endl;// !!!!!
+    // } // !!!!!
 
     //Assemble local K and F into global K and F
     //You will need to used local_dof_indices[A]
@@ -427,29 +435,43 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     // Важно помнить, что K - sparse (разреженная) матрица, поэтому нельзя просто написать K[i][j], используется команда K.add
     //*приводить матрицу K к квадратному виду (в задаче Дирихле) здесь не нужно, это делает deal.II с помощью apply_boundary_values
     for(unsigned int A=0; A<dofs_per_elem; A++){
-      //EDIT_DONE - add component A of Flocal to the correct location in F
+      //EDIT_DONE_? - add component A of Flocal to the correct location in F
       /*Remember, local_dof_indices[A] is the global degree-of-freedom number corresponding to element node number A*/
       F[local_dof_indices[A]] += Flocal[A];
 
       for(unsigned int B=0; B<dofs_per_elem; B++){
-        //EDIT_DONE - add component A,B of Klocal to the correct location in K (using local_dof_indices)
+        //EDIT_DONE_? - add component A,B of Klocal to the correct location in K (using local_dof_indices)
         /*Note: K is a sparse matrix, so you need to use the function "add".
           For example, to add the variable C to K[i][j], you would use:
           K.add(i,j,C);*/
+          // std::cout<<local_dof_indices[A] << " " << local_dof_indices[B] << " " << Klocal[A][B]<< std::endl; // !!!!!
           K.add(local_dof_indices[A], local_dof_indices[B], Klocal[A][B]);
       }
     }
   }
 
+  // Вывод вектора F
+  std::cout << "Вектор F:" << std::endl;
+  for (int i = 0; i < K.get_sparsity_pattern().n_rows(); i++)
+    std::cout << F[i] << "\t";
+  std::cout << std::endl;
+
   //Apply Dirichlet boundary conditions
   /*deal.II applies Dirichlet boundary conditions (using the boundary_values map we
     defined in the function "define_boundary_conds") without resizing K or F*/
   MatrixTools::apply_boundary_values (boundary_values, K, D, F, false);
+
+
+  // Вывод вектора F
+  std::cout << "Вектор F:" << std::endl;
+  for (int i = 0; i < K.get_sparsity_pattern().n_rows(); i++)
+    std::cout << F[i] << "\t";
+  std::cout << std::endl;
 }
 
 //Solve for D in KD=F
 template <int dim>
-void FEM<dim>::solve(){ // ничего не нужно менять
+void FEM<dim>::solve(){
 
   //Solve for D
   SparseDirectUMFPACK  A; // разреженная матрица для конкретного решателя UMFPACK
@@ -517,13 +539,15 @@ double FEM<dim>::l2norm_of_error(){ // функция подсчёта l2 оши
 
       if (prob == 1) { // задача Дирихле-Дирихле
         dudx0 = (g2 + pow(10,11) * pow(L, 3) / (6 * pow(10,11)) - g1) / L;
+      } else {
+        // dudx0 = ;
       }
 
-      u_exact = dudx0 * x - pow(10,11) * pow(L, 3) / (6 * pow(10,11)) + g1; // подсчёт аналитического решения (см рисовалки в paint, аналитическое решение 2)
+      u_exact = dudx0 * x - pow(10,11) * pow(x, 3) / (6 * pow(10,11)) + g1; // подсчёт аналитического решения (см рисовалки в paint, аналитическое решение 2)
 
       l2norm += (pow(u_h,2) - 2 * u_exact * u_h + pow(u_exact,2)) * quad_weight[q] * h_e / 2; //по квадратурной формуле Гаусса
     }
   }
-  
+
   return sqrt(l2norm);
 }
