@@ -160,7 +160,7 @@ double FEM<dim>::basis_function(unsigned int node, double xi){ // A - node, xi -
   //EDIT_DONE
   //цикл по узлам в эл-те, n_ne - число узлов в эл-те=order+1
   for (unsigned int B=0; B<basisFunctionOrder+1; B++){
-    if B != node {
+    if (B != node) {
       value *= (xi - xi_at_node(B)) / (xi_at_node(node) - xi_at_node(B));
     }
   }
@@ -184,35 +184,47 @@ double FEM<dim>::basis_gradient(unsigned int node, double xi){
     at any node in the element - using deal.II's element node numbering pattern.*/
 
   //EDIT_DONE_?
-  switch(basisFunctionOrder)  //basisFunctionOrder - max B, node - A
+  switch(int(basisFunctionOrder))  //basisFunctionOrder - max B, node - A
   {
       case 1:  // A!=B, А=1    для линейных базисных функций существует 2 node (в коде нумерация с 0 - узлы 0 и 1, а в лекциях с 1 - узлы 1 и 2)
-          switch(node){
-            case 0:
-              value = -1/2;
-            case 1:
-              value = 1/2;
-          }
+        switch(node){
+          case 0:
+            value = -1/2;
+            break;
+          case 1:
+            value = 1/2;
+            break;
+        }
+        break;
       case 2:   // для квадратичных базисных функций
-          switch(node){
-            case 0:
-              value = xi-1/2;
-            case 1:
-              value = -2*xi;
-            case 2:
-              value = xi+1/2;
-          }
+        switch(node){
+          case 0:
+            value = xi-1/2;
+            break;
+          case 1:
+            value = -2*xi;
+            break;
+          case 2:
+            value = xi+1/2;
+            break;
+        }
+        break;
       case 3:
-          switch(node){
-            case 0:
-              value = -27/16 * pow(xi, 2) + 9/8 * xi + 1/16;
-            case 1:
-              value = 81/16 * pow(xi, 2) - 9/8 * xi - 27/16;
-            case 2:
-              value = -81/16 * pow(xi, 2) - 9/8 * xi + 27/16;
-            case 3:
-              value = 27/16 * pow(xi, 2) + 9/8 * xi - 1/16;;
-          }
+        switch(node){
+          case 0:
+            value = -27/16 * pow(xi, 2) + 9/8 * xi + 1/16;
+            break;
+          case 1:
+            value = 81/16 * pow(xi, 2) - 9/8 * xi - 27/16;
+            break;
+          case 2:
+            value = -81/16 * pow(xi, 2) - 9/8 * xi + 27/16;
+            break;
+          case 3:
+            value = 27/16 * pow(xi, 2) + 9/8 * xi - 1/16;
+            break;
+        }
+        break;
   }
   return value;
 }
@@ -222,7 +234,7 @@ template <int dim>
 void FEM<dim>::generate_mesh(unsigned int numberOfElements){
 
   //Define the limits of your domain
-  L = 0.1; //EDIT_DONE_??? (в записи 1?)
+  L = 0.1; //EDIT_DONE_??? (в записи 1?, а в задаче 0.1)
   double x_min = 0.; // слева координата 0
   double x_max = L; // справа координата L
 
@@ -379,11 +391,11 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
           //nodeLocation - берет X_e_A, 
           //local_dof_indices мапит локальный номер узла к глобальному, а nodeLocation хранит координаты х 
         }
-        //EDIT - Define Flocal.
+        //EDIT_DONE_? - Define Flocal.
         // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
         //согласно заданию, F(x) = f = 10^11Нм^(−4)*x, Нм - Ньютон на метр
         //long long pow(10, 11)
-        Flocal[A] += basis_function(A, quad_points(q)) * pow(10, 11) * x * quad_weight[q];        
+        Flocal[A] += basis_function(A, quad_points[q]) * pow(10, 11) * x * quad_weight[q];        
       }
       Flocal[A] *= h_e/2;
     }
@@ -391,8 +403,8 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     // если задача имеет номер 2, то используем это условие для определения правой части (вкладываем его в вектор F)
     if(prob == 2){ 
       if(nodeLocation[local_dof_indices[1]] == L){
-	    //EDIT - Modify Flocal to include the traction on the right boundary.
-      Flocal[dofs_per_elem - 1]  += pow(10, 11)  // -1, т.к. индексы с 0, а нумерация узлов с 1, (индекс 0 - 1й узел) ???
+	    //EDIT_DONE_? - Modify Flocal to include the traction on the right boundary.
+        Flocal[dofs_per_elem - 1]  += pow(10, 10);  // -1, т.к. индексы с 0, а нумерация узлов с 1, (индекс 0 - 1й узел) ??? (граничное условие Неймана, добавляем tA к последнему элементу вектора сил, в задаче A=1, t=h=10^10 Ньютон*метр^-2)
       }
     }
 
@@ -498,13 +510,20 @@ double FEM<dim>::l2norm_of_error(){ // функция подсчёта l2 оши
         u_h += D[local_dof_indices[B]] * basis_function(B, quad_points[q]); 
         // восстанавливаем u_h только в тех точках, что нам нужны (зная степени сводобы local_dof_indices[B], так как уже решили систему (нашли D), и используя базисные функции)
       }
-      //EDIT - Find the l2-norm of the error through numerical integration.
+      //EDIT_DONE_? - Find the l2-norm of the error through numerical integration.
       /*This includes evaluating the exact solution at the quadrature points*/
-      u_exact = 
 
-      l2norm +=                     //по квадратурной формуле Гаусса
+      double dudx0 = 0.; // значение сигмы, делённой на E в нуле 
+
+      if (prob == 1) { // задача Дирихле-Дирихле
+        dudx0 = (g2 + pow(10,11) * pow(L, 3) / (6 * pow(10,11)) - g1) / L;
+      }
+
+      u_exact = dudx0 * x - pow(10,11) * pow(L, 3) / (6 * pow(10,11)) + g1; // подсчёт аналитического решения (см рисовалки в paint, аналитическое решение 2)
+
+      l2norm += (pow(u_h,2) - 2 * u_exact * u_h + pow(u_exact,2)) * quad_weight[q] * h_e / 2; //по квадратурной формуле Гаусса
     }
   }
-
+  
   return sqrt(l2norm);
 }
