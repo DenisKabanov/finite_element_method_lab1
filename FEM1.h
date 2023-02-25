@@ -165,6 +165,9 @@ double FEM<dim>::basis_function(unsigned int node, double xi){ // A - node, xi -
     }
   }
 
+  // вывод значения базисной функции
+  // std::cout << "basis function at node(A): " << node << " xi: " << xi << " value: " << value << std::endl; // !!!!!!
+  
   return value;
 }
 
@@ -226,7 +229,7 @@ double FEM<dim>::basis_gradient(unsigned int node, double xi){
       }
       break;
   }
-  // std::cout << "returning value: " << value << std::endl; // !!!!!
+//  std::cout << "returning value: " << value << std::endl; // !!!!!
   return value;
 }
 
@@ -325,9 +328,21 @@ void FEM<dim>::setup_system(){
   // веса (википедия, находятся из условия точного подсчёта интегралов до определённой степени)
   quad_weight[0] = 1.; //EDIT
   quad_weight[1] = 1.; //EDIT
-
   //==============================================
+  // quadRule = 3; //EDIT - Number of quadrature points along one dimension (нам этого будет мало, quadRule = 2 - точное интегрирование вплоть до многочленов третьей степени)
+  // //в лекциях quadRule - n_int (стр.8)
+  // quad_points.resize(quadRule); quad_weight.resize(quadRule);
 
+  // // задание точек для вычисления значения функция при интегрировании (точки - корни многочленов Лежандра соответствующей степени, в данном примере - второй)
+  // quad_points[0] = -sqrt(3./5.); //EDIT
+  // quad_points[1] = 0.;
+  // quad_points[2] = sqrt(3./5.); //EDIT
+
+  // // веса (википедия, находятся из условия точного подсчёта интегралов до определённой степени)
+  // quad_weight[0] = 5./9.; //EDIT
+  // quad_weight[1] = 8./9.; //EDIT
+  // quad_weight[1] = 5./9.; //EDIT
+  //==============================================
 
   //Just some notes...
   std::cout << "   Number of active elems:       " << triangulation.n_active_cells() << std::endl;
@@ -388,10 +403,13 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
         //Interpolate the x-coordinates at the nodes to find the x-coordinate at the quad pt.
         for(unsigned int B=0; B<dofs_per_elem; B++){ // интерполяция для отображения локальных координат xi в глобальный x
           // (преобразуем кси в икс, пользуясь изопараметрической формулировкой)
-          x += nodeLocation[local_dof_indices[B]]*basis_function(B, quad_points[q]); // для подсчёта f(x(xi_j))?
+
+//          std::cout << "real x location: " << nodeLocation[local_dof_indices[B]] << std::endl; // !!!!!
+          x += nodeLocation[local_dof_indices[B]]*basis_function(B, quad_points[q]); // для подсчёта f(x(xi_j))
           //nodeLocation - берет X_e_A, 
           //local_dof_indices мапит локальный номер узла к глобальному, а nodeLocation хранит координаты х 
         }
+//        std::cout << "A: " << A << "; x with respect to Legandre root: " << x << std::endl; // !!!!!
         //EDIT_DONE_? - Define Flocal.
         // надо определить Flocal, используя квадратуру Гаусса для нахождения интеграла
         //согласно заданию, F(x) = f = 10^11Нм^(−4)*x, Нм - Ньютон на метр
@@ -400,6 +418,12 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
       }
       Flocal[A] *= h_e/2;
     }
+
+//    вывод Flocal для элемента elem !!!!!
+//    for(int A=0; A<dofs_per_elem;A++){// !!!!!
+//      std::cout << "elem: " << A << " Flocal[elem]: " << Flocal[A] << std::endl;// !!!!!
+//    } // !!!!!
+
     //Add nonzero Neumann condition, if applicable
     // если задача имеет номер 2, то используем это условие для определения правой части (вкладываем его в вектор F)
     if(prob == 2){ 
@@ -418,7 +442,7 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
           // вставить код для определения компонентов Klocal (применить квадратурные формулы Гаусса)
           // Klocal[i][j] = int(от -1 до 1) (N_i'xi * N_j'xi) dxi
           // std::cout << basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q] << std::endl;// !!!!!
-          Klocal.add(A, B, basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q]);
+          Klocal.add(A, B, 2. * pow(10,11) / h_e * basis_gradient(A, quad_points[q]) * basis_gradient(B, quad_points[q]) * quad_weight[q]);
         }
       }
     }
@@ -450,7 +474,11 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     }
   }
 
-  // Вывод вектора F
+  // Вывод матрицы K !!!!!
+  std::cout << "Матрица K:" << std::endl;
+  K.print(std::cout, false, false);
+
+  // Вывод вектора F !!!!!
   std::cout << "Вектор F:" << std::endl;
   for (int i = 0; i < K.get_sparsity_pattern().n_rows(); i++)
     std::cout << F[i] << "\t";
@@ -461,12 +489,14 @@ void FEM<dim>::assemble_system(){ // ассемблирование (перех�
     defined in the function "define_boundary_conds") without resizing K or F*/
   MatrixTools::apply_boundary_values (boundary_values, K, D, F, false);
 
+  // Вывод матрицы K !!!!!
+  // K.print(std::cout, false, false);
 
-  // Вывод вектора F
-  std::cout << "Вектор F:" << std::endl;
-  for (int i = 0; i < K.get_sparsity_pattern().n_rows(); i++)
-    std::cout << F[i] << "\t";
-  std::cout << std::endl;
+  // Вывод вектора F !!!!!
+  // std::cout << "Вектор F:" << std::endl;
+  // for (int i = 0; i < K.get_sparsity_pattern().n_rows(); i++)
+  //   std::cout << F[i] << "\t";
+  // std::cout << std::endl;
 }
 
 //Solve for D in KD=F
@@ -529,7 +559,7 @@ double FEM<dim>::l2norm_of_error(){ // функция подсчёта l2 оши
       for(unsigned int B=0; B<dofs_per_elem; B++){
         // преобразуем кси в икс, пользуясь изопараметрической формулировкой
         x += nodeLocation[local_dof_indices[B]] * basis_function(B, quad_points[q]); // для подсчёта u_h в произвольном xi
-        u_h += D[local_dof_indices[B]] * basis_function(B, quad_points[q]); 
+        u_h += D[local_dof_indices[B]] * basis_function(B, quad_points[q]);
         // восстанавливаем u_h только в тех точках, что нам нужны (зная степени сводобы local_dof_indices[B], так как уже решили систему (нашли D), и используя базисные функции)
       }
       //EDIT_DONE_? - Find the l2-norm of the error through numerical integration.
@@ -538,14 +568,18 @@ double FEM<dim>::l2norm_of_error(){ // функция подсчёта l2 оши
       double dudx0 = 0.; // значение сигмы, делённой на E в нуле 
 
       if (prob == 1) { // задача Дирихле-Дирихле
-        dudx0 = (g2 + pow(10,11) * pow(L, 3) / (6 * pow(10,11)) - g1) / L;
+        // dudx0 = (g2 + pow(10,11) * pow(L, 3) / (6 * pow(10,11)) - g1) / L;
+        dudx0 = (g2 + pow(L, 3) / 6  - g1) / L; // убрали повторяющиеся значения pow(10,11)
       } else {
         // dudx0 = ;
       }
 
-      u_exact = dudx0 * x - pow(10,11) * pow(x, 3) / (6 * pow(10,11)) + g1; // подсчёт аналитического решения (см рисовалки в paint, аналитическое решение 2)
+      // подсчёт аналитического решения (см рисовалки в paint, аналитическое решение 2)
+      // u_exact = dudx0 * x - pow(10,11) * pow(x, 3) / (6 * pow(10,11)) + g1;
+      u_exact = dudx0 * x - pow(x, 3) / 6  + g1; // убрали повторяющиеся значения pow(10,11)
 
-      l2norm += (pow(u_h,2) - 2 * u_exact * u_h + pow(u_exact,2)) * quad_weight[q] * h_e / 2; //по квадратурной формуле Гаусса
+      // l2norm += (pow(u_h,2) - 2 * u_exact * u_h + pow(u_exact,2)) * quad_weight[q] * h_e / 2; //по квадратурной формуле Гаусса
+      l2norm += pow((u_h - u_exact), 2) * quad_weight[q] * h_e / 2; //по квадратурной формуле Гаусса
     }
   }
 
